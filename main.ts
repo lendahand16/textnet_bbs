@@ -138,8 +138,23 @@ namespace Commands {
 	}
 }
 
-async function commandHandler(conn: Deno.Conn, line: string) {
+enum CommandSignal {
+	MAIN,
+	SUB,
+	END_SUB,
+	QUIT
+}
+
+async function textNetCommands(conn: Deno.Conn, sessID: number) {
+
+	const promptText = "cid-"+String(sessID).padStart(3,'0');
+
+	await setPrompt(conn, promptText);
 	
+	for await (const line of readlines(conn)) {
+		if (line === "QUIT" || line === "quit" || line === SpecialChars.END) break;
+	}
+	let line = "";
 	const lineSplit = line.split(" ");
 	const commandIdentifier = lineSplit[0].toLowerCase();
 
@@ -154,17 +169,10 @@ async function commandHandler(conn: Deno.Conn, line: string) {
 
 async function connectionThread(conn: Deno.Conn, sessID: number) {
 
-	const promptText = "cid-"+String(sessID).padStart(3,'0');
+	let currentCommand: CommandSignal = CommandSignal.QUIT;
 
 	console.log("OPEN ID:"+sessID);
-	await setPrompt(conn, promptText);
-
-	for await (const line of readlines(conn)) {
-		if (line === "QUIT" || line === "quit" || line === SpecialChars.END) break;
-		await commandHandler(conn, line);
-		await setPrompt(conn, promptText);
-	}
-	
+	await textNetCommands(conn, sessID);	
 	await sendMessage(conn, "Bye Bye!", SERVER_CAT);
 	conn.close();
 	console.log("QUIT ID:"+sessID);
